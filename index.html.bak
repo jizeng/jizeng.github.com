@@ -20,7 +20,7 @@
 		<div id="content">
 				
 			<div id="code">
-				<div  style="background-color:green;width:160px;height:20px;padding:40px;color:#ffffff;">
+				<div  style="background-color:green;width:160px;height:20px;padding:40px;color:#ffffff;" onclick="this.innerHTML='<h2>Ñ©¶ù£¬ÎÒ°®Äã!</h2>'">
 			<h2>HAPPY BIRTHDAY</h2>
 			</div></br></br>
 				Ñ©¶ù£º</br>
