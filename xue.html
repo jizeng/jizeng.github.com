@@ -1,0 +1,117 @@
+<!DOCTYPE HTML>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+	<title>Happy Birthday</title>
+	<meta http-equiv="content-type" content="text/html; charset="UTF-8">
+	<style type="text/css">
+		@font-face {
+			font-family: digit;
+			src: url('digital-7_mono.ttf') format("truetype");
+		}
+	</style>
+	<link href="css/default.css" type="text/css" rel="stylesheet">
+	<script type="text/javascript" src="js/jquery.js"></script>
+	<script type="text/javascript" src="js/garden.js"></script>
+    <script type="text/javascript" src="js/functions.js"></script>
+</head>
+
+<body>
+	<div id="mainDiv">
+		<div id="content">
+				
+			<div id="code">
+				<div  style="background-color:green;width:160px;height:20px;padding:40px;color:#ffffff;" onclick="this.innerHTML='<h2>雪儿，我爱你!</h2>'">
+			<h2>HAPPY BIRTHDAY</h2>
+			</div></br></br>
+				雪儿：</br>
+				生日快乐</br>
+				弹指间，四年一晃而过</br>
+				因为你的陪伴，我很幸福</br>
+				因为你的鼓励，我重新点燃理想</br>
+				因为你的支持，我充满了斗志</br>
+				因为有你，我越来越快乐</br>
+				相信自己，相信我</br>
+				以后的生活会越来越美好</br>
+				<div onmouseover="mOver()" onmouseout="mOut()" >
+					<h2 >美女长大了变成了大美女</h2>
+				</div></br>
+				<img id="pic" src="i/xue.jpg" width="240" height="320"/>
+			</div>
+			<a href="http://music.163.com/#/song?id=1210496">what are words</a>
+			<audio controls="controls" autoplay="autoplay">
+			  <source src="i/what.ogg" type="audio/ogg" />
+			  <source src="i/what.mp3" type="audio/mpeg" />
+			Your browser does not support the audio element.
+			</audio>
+			
+			<div id="loveHeart">
+				<canvas id="garden"></canvas>
+				<div id="words">
+					<div id="messages">
+						雪糕，我们已经在一起：
+						<div id="elapseClock"></div>
+					</div>
+					<div id="loveu">
+						
+						<div class="signature">- 爱你的冰吉凌</div>
+					</div>
+				</div>
+			</div>
+		</div>
+		
+	</div>
+	<script type="text/javascript">
+		var offsetX = $("#loveHeart").width() / 2;
+		var offsetY = $("#loveHeart").height() / 2 - 55;
+		var together = new Date();
+		together.setFullYear(2010, 5, 8);
+		together.setHours(20);
+		together.setMinutes(0);
+		together.setSeconds(0);
+		together.setMilliseconds(0);
+		
+		if (!document.createElement('canvas').getContext) {
+			var msg = document.createElement("div");
+			msg.id = "errorMsg";
+			msg.innerHTML = "Your browser doesn't support HTML5!<br/>Recommend use Chrome 14+/IE 9+/Firefox 7+/Safari 4+"; 
+			document.body.appendChild(msg);
+			$("#code").css("display", "none")
+			//$("#copyright").css("position", "absolute");
+			//$("#copyright").css("bottom", "10px");
+		    document.execCommand("stop");
+		} else {
+			setTimeout(function () {
+				startHeartAnimation();
+			}, 5000);
+
+			timeElapse(together);
+			setInterval(function () {
+				timeElapse(together);
+			}, 500);
+
+			adjustCodePosition();
+			$("#code").typewriter();
+		}
+		function mOver()
+			{
+				document.getElementById("pic").src="i/xue2.jpg";
+			}
+			
+			function mOut()
+			{
+				document.getElementById("pic").src="i/xue.jpg";
+			}
+			/*
+			function mOver(obj)
+			{
+			obj.innerHTML="<h2>我爱你,雪儿</h2>"
+			}
+			
+			function mOut(obj)
+			{
+			obj.innerHTML="<h2>雪儿，生日快乐</h2>"
+			}
+			*/
+	</script>
+</body>
+</html>
