@@ -1,0 +1,630 @@
+
+<!DOCTYPE HTML>
+<html lang="" >
+    <head>
+        <meta charset="UTF-8">
+        <meta content="text/html; charset=utf-8" http-equiv="Content-Type">
+        <title>记一次mysql死锁 · GitBook</title>
+        <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+        <meta name="description" content="">
+        <meta name="generator" content="GitBook 3.2.3">
+        
+        
+        
+    
+    <link rel="stylesheet" href="gitbook/style.css">
+
+    
+            
+                
+                <link rel="stylesheet" href="gitbook/gitbook-plugin-highlight/website.css">
+                
+            
+                
+                <link rel="stylesheet" href="gitbook/gitbook-plugin-search/search.css">
+                
+            
+                
+                <link rel="stylesheet" href="gitbook/gitbook-plugin-fontsettings/website.css">
+                
+            
+        
+
+    
+
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+        
+    
+
+        
+    
+    
+    <meta name="HandheldFriendly" content="true"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black">
+    <link rel="apple-touch-icon-precomposed" sizes="152x152" href="gitbook/images/apple-touch-icon-precomposed-152.png">
+    <link rel="shortcut icon" href="gitbook/images/favicon.ico" type="image/x-icon">
+
+    
+    
+    <link rel="prev" href="走出焦虑.html" />
+    
+
+    </head>
+    <body>
+        
+<div class="book">
+    <div class="book-summary">
+        
+            
+<div id="book-search-input" role="search">
+    <input type="text" placeholder="Type to search" />
+</div>
+
+            
+                <nav role="navigation">
+                
+
+
+<ul class="summary">
+    
+    
+
+    
+
+    
+        
+        
+    
+        <li class="chapter " data-level="1.1" data-path="./">
+            
+                <a href="./">
+            
+                    
+                    Introduction
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter " data-level="1.2" data-path="走出焦虑.html">
+            
+                <a href="走出焦虑.html">
+            
+                    
+                    走出焦虑
+            
+                </a>
+            
+
+            
+        </li>
+    
+        <li class="chapter active" data-level="1.3" data-path="死锁.html">
+            
+                <a href="死锁.html">
+            
+                    
+                    记一次mysql死锁
+            
+                </a>
+            
+
+            
+        </li>
+    
+
+    
+
+    <li class="divider"></li>
+
+    <li>
+        <a href="https://www.gitbook.com" target="blank" class="gitbook-link">
+            Published with GitBook
+        </a>
+    </li>
+</ul>
+
+
+                </nav>
+            
+        
+    </div>
+
+    <div class="book-body">
+        
+            <div class="body-inner">
+                
+                    
+
+<div class="book-header" role="navigation">
+    
+
+    <!-- Title -->
+    <h1>
+        <i class="fa fa-circle-o-notch fa-spin"></i>
+        <a href="." >记一次mysql死锁</a>
+    </h1>
+</div>
+
+
+
+
+                    <div class="page-wrapper" tabindex="-1" role="main">
+                        <div class="page-inner">
+                            
+<div id="book-search-results">
+    <div class="search-noresults">
+    
+                                <section class="normal markdown-section">
+                                
+                                <h1 id="&#x8BB0;&#x4E00;&#x6B21;mysql&#x6B7B;&#x9501;&#xFF08;gapnext-key-lock--insert-intention-lock&#xFF09;">&#x8BB0;&#x4E00;&#x6B21;mysql&#x6B7B;&#x9501;&#xFF08;gap/next-key lock &amp; insert intention lock&#xFF09;</h1>
+<p>&#x8BF4;&#x660E;&#xFF1A;</p>
+<p>&#xFF08;1&#xFF09;&#x4E3A;&#x65B9;&#x4FBF;&#x6D4B;&#x8BD5;&#xFF0C;&#x4EE5;&#x4E0B;&#x6D4B;&#x8BD5;&#x5747;&#x4F7F;&#x7528;test &#x6D4B;&#x8BD5;&#x8868;&#xFF0C;&#x5176;&#x8868;&#x7ED3;&#x6784;&#x4E3A;&#xFF1A;</p>
+<pre><code>              Table: test
+Create Table: CREATE TABLE `test` (
+  `id` bigint(20) NOT NULL,
+  `oid` bigint(20) NOT NULL,
+  `status` tinyint(2) DEFAULT &apos;0&apos;,
+  PRIMARY KEY (`id`),
+  KEY `idx_oid` (`oid`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8
+</code></pre><p>&#xFF08;2&#xFF09;&#x4EE5;&#x4E0B;&#x4E8B;&#x7269;&#x9694;&#x79BB;&#x7EA7;&#x522B;&#x5747;&#x4E3A;RR</p>
+<h2 id="&#x4E00;&#x3001;&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;">&#x4E00;&#x3001;&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;</h2>
+<h3 id="11-&#x8BA4;&#x8BC6;&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;">1.1 &#x8BA4;&#x8BC6;&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;</h3>
+<p>&#x5B98;&#x65B9;&#x4ECB;&#x7ECD;&#xFF1A;</p>
+<p><a href="https://dev.mysql.com/doc/refman/8.0/en/innodb-locking.html#innodb-insert-intention-locks" target="_blank">Insert Intention Locks</a></p>
+<p>&#x63D2;&#x5165;&#x82E5;&#x5E72;&#x6570;&#x636E;&#x5982;&#x4E0B;</p>
+<pre><code>mysql&gt; select * from test;
++----+-----+--------+
+| id | oid | status |
++----+-----+--------+
+|  1 |   1 |      0 |
+|  2 |   2 |      0 |
+|  5 |   5 |      0 |
+| 10 |  10 |      0 |
++----+-----+--------+
+</code></pre><p>&#xFF08;1&#xFF09;&#x6309;&#x65F6;&#x5E8F;&#x5206;&#x522B;&#x6267;&#x884C;&#x4E24;&#x4E2A;&#x4E8B;&#x7269;&#xFF1A;</p>
+<table>
+<thead>
+<tr>
+<th>time</th>
+<th>trx_a</th>
+<th>trx_b</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>time_1</td>
+<td>start transaction;</td>
+<td></td>
+</tr>
+<tr>
+<td>time_2</td>
+<td></td>
+<td>start transaction;</td>
+</tr>
+<tr>
+<td>time_3</td>
+<td>select * from test where oid = 5 for update ;</td>
+<td></td>
+</tr>
+<tr>
+<td>time_4</td>
+<td></td>
+<td>insert into test set id = 3, oid = 3; &#xFF08;&#x9501;&#x7B49;&#x5F85;&#xFF0C; &#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;&#xFF09;</td>
+</tr>
+</tbody>
+</table>
+<p>&#xFF08;2&#xFF09;show engine innodb status :</p>
+<pre><code>------------
+TRANSACTIONS
+------------
+Trx id counter 57450
+Purge done for trx&apos;s n:o &lt; 57448 undo n:o &lt; 0 state: running but idle
+History list length 716
+LIST OF TRANSACTIONS FOR EACH SESSION:
+---TRANSACTION 281479621176896, not started
+0 lock struct(s), heap size 1136, 0 row lock(s)
+---TRANSACTION 57449, ACTIVE 4 sec inserting
+mysql tables in use 1, locked 1
+LOCK WAIT 2 lock struct(s), heap size 1136, 1 row lock(s), undo log entries 1
+MySQL thread id 3, OS thread handle 123145316274176, query id 277 localhost root update
+insert into test set id = 3, oid = 3
+------- TRX HAS BEEN WAITING 4 SEC FOR THIS LOCK TO BE GRANTED:
+RECORD LOCKS space id 1089 page no 4 n bits 80 index idx_oid of table `test`.`test` trx id 57449 lock_mode X locks gap before rec insert intention waiting
+//&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;
+
+
+Record lock, heap no 6 PHYSICAL RECORD: n_fields 2; compact format; info bits 0
+ 0: len 8; hex 8000000000000005; asc         ;;
+ 1: len 8; hex 8000000000000004; asc         ;;
+
+------------------
+---TRANSACTION 57448, ACTIVE 8 sec
+4 lock struct(s), heap size 1136, 5 row lock(s)
+MySQL thread id 4, OS thread handle 123145316552704, query id 276 localhost root cleaning up
+</code></pre><p>&#x5176;&#x4E2D;  gap before rec insert intention waiting &#x5373;&#x4E3A;&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;</p>
+<h3 id="12-&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;&#x7684;&#x7279;&#x6027;&#x4E0E;&#x4F5C;&#x7528;">1.2 &#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;&#x7684;&#x7279;&#x6027;&#x4E0E;&#x4F5C;&#x7528;</h3>
+<p><a href="&#x8BBA;%20MySql%20InnoDB%20&#x5982;&#x4F55;&#x901A;&#x8FC7;&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;&#x63A7;&#x5236;&#x5E76;&#x53D1;&#x63D2;&#x5165;">&#x8BBA; MySql InnoDB &#x5982;&#x4F55;&#x901A;&#x8FC7;&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;&#x63A7;&#x5236;&#x5E76;&#x53D1;&#x63D2;&#x5165;</a> &#x4ECB;&#x7ECD;&#x4E86;&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;&#x7684;&#x4E3B;&#x8981;&#x4F5C;&#x7528;&#xFF1A;<strong>&#x63D0;&#x5347;&#x5E76;&#x53D1;&#x63D2;&#x5165;&#x80FD;&#x529B;</strong>&#x3002;</p>
+<blockquote>
+<p>&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;&#x672C;&#x8D28;&#x4E0A;&#x53EF;&#x4EE5;&#x770B;&#x6210;&#x662F;&#x4E00;&#x4E2A;<code>Gap Lock</code></p>
+<ul>
+<li>&#x666E;&#x901A;&#x7684;Gap Lock &#x4E0D;&#x5141;&#x8BB8; &#x5728; &#xFF08;&#x4E0A;&#x4E00;&#x6761;&#x8BB0;&#x5F55;&#xFF0C;&#x672C;&#x8BB0;&#x5F55;&#xFF09; &#x8303;&#x56F4;&#x5185;&#x63D2;&#x5165;&#x6570;&#x636E;</li>
+<li>&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;Gap Lock &#x5141;&#x8BB8; &#x5728; &#xFF08;&#x4E0A;&#x4E00;&#x6761;&#x8BB0;&#x5F55;&#xFF0C;&#x672C;&#x8BB0;&#x5F55;&#xFF09; &#x8303;&#x56F4;&#x5185;&#x63D2;&#x5165;&#x6570;&#x636E;</li>
+</ul>
+<p>&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;&#x7684;&#x4F5C;&#x7528;&#x662F;&#x4E3A;&#x4E86;<strong>&#x63D0;&#x9AD8;&#x5E76;&#x53D1;&#x63D2;&#x5165;&#x7684;&#x6027;&#x80FD;</strong>&#xFF0C; &#x591A;&#x4E2A;&#x4E8B;&#x52A1; &#x540C;&#x65F6;&#x5199;&#x5165; &#x4E0D;&#x540C;&#x6570;&#x636E; &#x81F3;&#x540C;&#x4E00;&#x7D22;&#x5F15;&#x8303;&#x56F4;&#xFF08;&#x533A;&#x95F4;&#xFF09;&#x5185;&#xFF0C;&#x5E76;&#x4E0D;&#x9700;&#x8981;&#x7B49;&#x5F85;&#x5176;&#x4ED6;&#x4E8B;&#x52A1;&#x5B8C;&#x6210;&#xFF0C;&#x4E0D;&#x4F1A;&#x53D1;&#x751F;&#x9501;&#x7B49;&#x5F85;</p>
+</blockquote>
+<p>&#x4F46;&#x662F;&#x9700;&#x8981;&#x6CE8;&#x610F;&#xFF1A;&#x9700;&#x8981;&#x5F3A;&#x8C03;&#x7684;&#x662F;&#xFF0C;&#x867D;&#x7136;<code>&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;</code>&#x4E2D;&#x542B;&#x6709;<code>&#x610F;&#x5411;&#x9501;</code>&#x4E09;&#x4E2A;&#x5B57;&#xFF0C;&#x4F46;&#x662F;&#x5B83;&#x5E76;&#x4E0D;&#x5C5E;&#x4E8E;<code>&#x610F;&#x5411;&#x9501;</code>&#x800C;&#x5C5E;&#x4E8E;<code>&#x95F4;&#x9699;&#x9501;</code>&#xFF0C;&#x56E0;&#x4E3A;<code>&#x610F;&#x5411;&#x9501;</code>&#x662F;<strong>&#x8868;&#x9501;</strong>&#x800C;<code>&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;</code>&#x662F;<strong>&#x884C;&#x9501;</strong>&#x3002;</p>
+<h3 id="13-&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;&#x548C;&#x5176;&#x4ED6;&#x9501;&#x7684;&#x517C;&#x5BB9;&#x6027;">1.3 &#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;&#x548C;&#x5176;&#x4ED6;&#x9501;&#x7684;&#x517C;&#x5BB9;&#x6027;</h3>
+<p> <a href="https://blog.csdn.net/u010841296/article/details/84204701" target="_blank">Mysql&#x9501;&#x8BE6;&#x89E3;&#xFF08;&#x884C;&#x9501;&#x3001;&#x8868;&#x9501;&#x3001;&#x610F;&#x5411;&#x9501;&#x3001;Gap&#x9501;&#x3001;&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;&#xFF09;</a>&#x7ED9;&#x51FA;&#x4E86;&#x9501;&#x4ECB;&#x7ECD;&#x53CA;&#x9501;&#x517C;&#x5BB9;&#x60C5;&#x51B5;&#xFF0C;&#x53CA;&#x5E38;&#x89C1;&#x7684;&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;&#x51B2;&#x7A81;&#x3002;</p>
+<p>&#x6CE8;1&#xFF1A;&#x517C;&#x5BB9;&#x6027;&#x9700;&#x8981;&#x5173;&#x6CE8;&#x52A0;&#x9501;&#x987A;&#x5E8F;&#xFF0C;&#x56E0;&#x6B64;&#x517C;&#x5BB9;&#x6027;&#x8868;&#x683C;&#x4E0D;&#x662F;&#x5BF9;&#x79F0;&#x7684;</p>
+<p>&#x6CE8;2&#xFF1A;&#x6B64;&#x8868;&#x683C;&#x9605;&#x8BFB;&#x65B9;&#x5F0F;&#x4E3A;&#xFF0C;&#x5148;&#x6A2A;&#x8F7D;&#x7EB5;&#xFF1B;&#x8868;&#x793A;&#x5148;&#x589E;&#x52A0;&#x6A2A;&#x5411;&#x7684;&#x67D0;&#x4E2A;&#x9501;&#xFF0C;&#x662F;&#x5426;&#x4E0E;&#x7EB5;&#x5411;&#x7684;&#x5176;&#x4ED6;&#x9501;&#x517C;&#x5BB9;</p>
+<table>
+<thead>
+<tr>
+<th>&#x662F;&#x5426;&#x517C;&#x5BB9;</th>
+<th>gap</th>
+<th>insert intention</th>
+<th>record</th>
+<th>next-key</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>gap</td>
+<td>&#x662F;</td>
+<td>&#x662F;</td>
+<td>&#x662F;</td>
+<td>&#x662F;</td>
+</tr>
+<tr>
+<td>insert intention</td>
+<td><strong>&#x5426;</strong></td>
+<td>&#x662F;</td>
+<td>&#x662F;</td>
+<td><strong>&#x5426;</strong></td>
+</tr>
+<tr>
+<td>record</td>
+<td>&#x662F;</td>
+<td>&#x662F;</td>
+<td><strong>&#x5426;</strong></td>
+<td><strong>&#x5426;</strong></td>
+</tr>
+<tr>
+<td>next-key</td>
+<td>&#x662F;</td>
+<td>&#x662F;</td>
+<td><strong>&#x5426;</strong></td>
+<td><strong>&#x5426;</strong></td>
+</tr>
+</tbody>
+</table>
+<p>&#x4ECE;&#x56FE;&#x4E2D;&#x53EF;&#x4EE5;&#x770B;&#x51FA;&#xFF0C;  &#x5982;&#x679C;&#x524D;&#x4E00;&#x4E2A;&#x4E8B;&#x52A1; <strong>&#x6301;&#x6709; gap &#x9501;&#xFF0C; &#x6216;&#x8005; next-key &#x9501;&#x7684;&#x65F6;&#x5019;&#xFF0C;&#x540E;&#x4E00;&#x4E2A;&#x4E8B;&#x52A1;&#x5982;&#x679C;&#x60F3;&#x8981;&#x6301;&#x6709; insert intention &#x9501;&#x7684;&#x65F6;&#x5019;&#x4F1A; &#x4E0D;&#x517C;&#x5BB9;&#xFF0C;&#x51FA;&#x73B0;&#x9501;&#x7B49;&#x5F85;</strong>&#x3002;</p>
+<h2 id="&#x4E8C;&#x3001;&#x6B7B;&#x9501;&#x5206;&#x6790;">&#x4E8C;&#x3001;&#x6B7B;&#x9501;&#x5206;&#x6790;</h2>
+<p>&#x4ECE;1.3&#x8282;&#x53EF;&#x4EE5;&#x770B;&#x51FA;&#xFF0C; &#x5173;&#x4E8E; insert intention &#x7684;&#x9501;&#x7B49;&#x5F85;&#x6709;&#x4E24;&#x79CD;&#x60C5;&#x51B5;</p>
+<p>case1: &#x4E8B;&#x52A1;a &#x83B7;&#x5F97; gap lock&#xFF1B; &#x4E8B;&#x52A1; b insert intention   &#x7B49;&#x5F85;</p>
+<p>case2: &#x4E8B;&#x52A1;a &#x83B7;&#x5F97;next-key lock;  &#x4E8B;&#x52A1; b   insert intention   &#x7B49;&#x5F85;;</p>
+<h3 id="21-&#x6B7B;&#x9501;&#x590D;&#x73B0;">2.1 &#x6B7B;&#x9501;&#x590D;&#x73B0;</h3>
+<p>&#x6700;&#x8FD1;&#x7EBF;&#x4E0A;&#x51FA;&#x73B0;&#x4E86;&#x6B7B;&#x9501;&#xFF0C;&#x539F;&#x56E0;&#x5C31;&#x662F;&#x57FA;&#x4E8E;case2, &#x548C; <a href="https://my.oschina.net/hebaodan/blog/1835966" target="_blank">mysql&#x5E76;&#x53D1;insert&#x6B7B;&#x9501;&#x95EE;&#x9898;&#x2014;&#x2014;gap&#x3001;&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;&#x51B2;&#x7A81;</a> &#x6709;&#x4E00;&#x70B9;&#x7C7B;&#x4F3C;&#xFF0C; &#x4F46;&#x662F;&#x672C;&#x4EBA;&#x9047;&#x5230;&#x662F;&#x7684;&#xFF0C;update &#x548C; insert &#x64CD;&#x4F5C; &#x5728;&#x4E24;&#x4E2A;&#x4E8B;&#x52A1;&#x5E76;&#x53D1;&#x7684;&#x65F6;&#x5019; &#x6B7B;&#x9501;&#xFF0C;&#x5177;&#x4F53;&#x5982;&#x4E0B;&#xFF1A;</p>
+<p>&#x4E8B;&#x52A1;&#x5F00;&#x59CB;&#x524D;&#xFF0C;&#x6570;&#x636E;&#x60C5;&#x51B5;&#x5982;&#x4E0B;&#xFF1A;</p>
+<pre><code>mysql&gt; select * from test;
++----+-----+--------+
+| id | oid | status |
++----+-----+--------+
+|  1 |   1 |      0 |
+|  2 |   2 |      0 |
+|  5 |   5 |      0 |
+| 10 |  10 |      0 |
++----+-----+--------+
+</code></pre><p>&#x6309;&#x7167;&#x65F6;&#x5E8F;&#x8FDB;&#x884C;&#x64CD;&#x4F5C;&#xFF0C;&#x51FA;&#x73B0;&#x6B7B;&#x9501;&#xFF0C;&#x5982;&#x4E0B;&#xFF1A;</p>
+<table>
+<thead>
+<tr>
+<th>time</th>
+<th>trx_a</th>
+<th>trx_b</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>time_1</td>
+<td>start transaction;</td>
+<td></td>
+</tr>
+<tr>
+<td>time_2</td>
+<td></td>
+<td>start transaction;</td>
+</tr>
+<tr>
+<td>time_3</td>
+<td>update test set status = 1 where oid = 5;</td>
+<td></td>
+</tr>
+<tr>
+<td>time_4</td>
+<td></td>
+<td>update test set status = 1 where oid = 5; (&#x9501;&#x7B49;&#x5F85;)</td>
+</tr>
+<tr>
+<td>time_5</td>
+<td>insert into test set id = 4, oid = 5;</td>
+<td>ERROR 1213 (40001): Deadlock found when trying to get lock; try restarting transaction</td>
+</tr>
+</tbody>
+</table>
+<p>&#x6B64;&#x65F6;&#x51FA;&#x73B0;&#x6B7B;&#x9501;&#xFF0C;&#x622A;&#x56FE;&#x5982;&#x4E0B;&#xFF1A;</p>
+<p><img src="pic/deadlock1.png" alt="image-20190708195820561"></p>
+<p> &#x6267;&#x884C; show engine innodb status , &#x627E;&#x5230;&#x5BF9;&#x5E94;&#x7684;   LATEST DETECTED DEADLOCK &#x5982;&#x4E0B;&#xFF08;&#x9644;&#x90E8;&#x5206;&#x89E3;&#x6790;&#xFF09;&#xFF1A;</p>
+<pre><code>------------------------
+LATEST DETECTED DEADLOCK
+------------------------
+2019-07-08 19:55:23 0x700000d95000
+*** (1) TRANSACTION:
+TRANSACTION 57432, ACTIVE 44 sec starting index read
+mysql tables in use 1, locked 1
+LOCK WAIT 2 lock struct(s), heap size 1136, 1 row lock(s)
+MySQL thread id 3, OS thread handle 123145316274176, query id 176 localhost root updating
+
+update test set status = 1 where oid = 5
+//&#x4E8B;&#x52A1;b&#x64CD;&#x4F5C;&#x8BED;&#x53E5;
+
+*** (1) WAITING FOR THIS LOCK TO BE GRANTED:
+
+RECORD LOCKS space id 1089 page no 4 n bits 72 index idx_oid of table `test`.`test` trx id 57432 lock_mode X waiting
+//RECORD LOCKS &#x8868;&#x793A;&#x8BB0;&#x5F55;&#x9501;,space id&#x4E3A;1089,page&#x53F7;4 &#xFF0C;n bits 72&#x8868;&#x793A;&#x8FD9;&#x4E2A;&#x805A;&#x96C6;&#x7D22;&#x5F15;&#x8BB0;&#x5F55;&#x9501;&#x7ED3;&#x6784;&#x4E0A;&#x7559;&#x6709;72&#x4E2A;Bit&#x4F4D;
+//&#x8868;&#x793A;&#x4E8B;&#x52A1;1 &#x6B63;&#x5728;&#x7B49;&#x5F85;&#x8868; test &#x4E0A;&#x7684; idx_oid &#x7684; X &#x9501;; &#x672C;&#x6848;&#x4F8B;&#x4E2D;&#x5176;&#x5B9E;&#x662F;Next-Key lock
+
+Record lock, heap no 4 PHYSICAL RECORD: n_fields 2; compact format; info bits 0
+ 0: len 8; hex 8000000000000005; asc         ;;
+ 1: len 8; hex 8000000000000005; asc         ;;
+
+*** (2) TRANSACTION:
+TRANSACTION 57431, ACTIVE 59 sec inserting
+mysql tables in use 1, locked 1
+5 lock struct(s), heap size 1136, 4 row lock(s), undo log entries 2
+MySQL thread id 4, OS thread handle 123145316552704, query id 177 localhost root update
+
+insert into test set id = 4, oid = 5
+//&#x4E8B;&#x52A1;a &#x7684;&#x64CD;&#x4F5C;sql
+
+*** (2) HOLDS THE LOCK(S):
+
+RECORD LOCKS space id 1089 page no 4 n bits 72 index idx_oid of table `test`.`test` trx id 57431 lock_mode X
+//&#x663E;&#x793A;&#x4E86;&#x4E8B;&#x52A1;2 insert into test set id = 4, oid = 5 &#x6301;&#x6709;&#x4E86;a=5 &#x7684;Lock mode X |LOCK_GAP 
+
+
+Record lock, heap no 4 PHYSICAL RECORD: n_fields 2; compact format; info bits 0
+ 0: len 8; hex 8000000000000005; asc         ;;
+ 1: len 8; hex 8000000000000005; asc         ;;
+
+*** (2) WAITING FOR THIS LOCK TO BE GRANTED:
+
+RECORD LOCKS space id 1089 page no 4 n bits 72 index idx_oid of table `test`.`test` trx id 57431 lock_mode X locks gap before rec insert intention waiting
+//&#x8868;&#x793A;&#x4E8B;&#x52A1;2&#x7684;insert &#x8BED;&#x53E5;&#x6B63;&#x5728;&#x7B49;&#x5F85;&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501; lock_mode X locks gap before rec insert intention waiting (LOCK_X + LOCK_REC_GAP )
+&#x8FD9;&#x91CC;&#x9700;&#x8981;&#x5404;&#x4F4D;&#x6CE8;&#x610F;&#x7684;&#x662F;&#x9501;&#x7EC4;&#x5408;&#xFF0C;&#x7C7B;&#x4F3C;lock_mode X waiting ,lock_mode X,lock_mode X locks gap before rec insert intention waiting &#x662F;&#x6211;&#x4EEC;&#x5206;&#x6790;&#x6B7B;&#x9501;&#x7684;&#x6838;&#x5FC3;&#x91CD;&#x70B9;&#x3002;
+
+
+Record lock, heap no 4 PHYSICAL RECORD: n_fields 2; compact format; info bits 0
+ 0: len 8; hex 8000000000000005; asc         ;;
+ 1: len 8; hex 8000000000000005; asc         ;;
+
+*** WE ROLL BACK TRANSACTION (1)
+</code></pre><p><a href="http://blog.itpub.net/22664653/viewspace-2145133/" target="_blank">&#x5982;&#x4F55;&#x9605;&#x8BFB;&#x6B7B;&#x9501;&#x65E5;&#x5FD7;</a> &#x6709;&#x8F83;&#x4E3A;&#x8BE6;&#x7EC6;&#x7684;&#x4ECB;&#x7ECD;&#x4E86;&#x5982;&#x4F55;&#x89E3;&#x8BFB;&#x6B7B;&#x9501;&#x65E5;&#x5FD7;&#xFF1B;&#x5173;&#x952E;&#x89E3;&#x6790;&#x5982;&#x4E0B;&#xFF1A;</p>
+<p>(1)&#x4E8B;&#x52A1;b&#x89E3;&#x6790;</p>
+<blockquote>
+<p>update test set status = 1 where oid = 5
+//&#x4E8B;&#x52A1;b&#x64CD;&#x4F5C;&#x8BED;&#x53E5;</p>
+<p><em>*</em> (1) WAITING FOR THIS LOCK TO BE GRANTED:</p>
+<p>RECORD LOCKS space id 1089 page no 4 n bits 72 index idx_oid of table <code>test</code>.<code>test</code> trx id 57432 lock_mode X waiting
+//RECORD LOCKS &#x8868;&#x793A;&#x8BB0;&#x5F55;&#x9501;,space id&#x4E3A;1089,page&#x53F7;4 &#xFF0C;n bits 72&#x8868;&#x793A;&#x8FD9;&#x4E2A;&#x805A;&#x96C6;&#x7D22;&#x5F15;&#x8BB0;&#x5F55;&#x9501;&#x7ED3;&#x6784;&#x4E0A;&#x7559;&#x6709;72&#x4E2A;Bit&#x4F4D;
+//&#x8868;&#x793A;&#x4E8B;&#x52A1;b &#x6B63;&#x5728;&#x7B49;&#x5F85;&#x8868; test &#x4E0A;&#x7684; idx_oid &#x7684; X &#x9501;; &#x672C;&#x6848;&#x4F8B;&#x4E2D;&#x5176;&#x5B9E;&#x662F;Next-Key lock</p>
+</blockquote>
+<p>(2)&#x4E8B;&#x52A1;a&#x89E3;&#x6790;</p>
+<blockquote>
+<p>insert into test set id = 4, oid = 5
+//&#x4E8B;&#x52A1;a &#x7684;&#x64CD;&#x4F5C;sql</p>
+<p><em>*</em> (2) HOLDS THE LOCK(S):</p>
+<p>RECORD LOCKS space id 1089 page no 4 n bits 72 index idx_oid of table <code>test</code>.<code>test</code> trx id 57431 lock_mode X
+//&#x663E;&#x793A;&#x4E86;&#x4E8B;&#x52A1;2 insert into test set id = 4, oid = 5 &#x6301;&#x6709;&#x4E86;a=5 &#x7684;Lock mode X |LOCK_GAP </p>
+<p>Record lock, heap no 4 PHYSICAL RECORD: n_fields 2; compact format; info bits 0
+0: len 8; hex 8000000000000005; asc         ;;
+1: len 8; hex 8000000000000005; asc         ;;</p>
+<p><em>*</em> (2) WAITING FOR THIS LOCK TO BE GRANTED:</p>
+<p>RECORD LOCKS space id 1089 page no 4 n bits 72 index idx_oid of table <code>test</code>.<code>test</code> trx id 57431 lock_mode X locks gap before rec insert intention waiting
+//&#x8868;&#x793A;&#x4E8B;&#x52A1;2&#x7684;insert &#x8BED;&#x53E5;&#x6B63;&#x5728;&#x7B49;&#x5F85;&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501; lock_mode X locks gap before rec insert intention waiting (LOCK_X + LOCK_REC_GAP )
+&#x8FD9;&#x91CC;&#x9700;&#x8981;&#x5404;&#x4F4D;&#x6CE8;&#x610F;&#x7684;&#x662F;&#x9501;&#x7EC4;&#x5408;&#xFF0C;&#x7C7B;&#x4F3C;lock_mode X waiting ,lock_mode X,lock_mode X locks gap before rec insert intention waiting &#x662F;&#x6211;&#x4EEC;&#x5206;&#x6790;&#x6B7B;&#x9501;&#x7684;&#x6838;&#x5FC3;&#x91CD;&#x70B9;&#x3002;</p>
+</blockquote>
+<p>&#x5177;&#x4F53;&#x5206;&#x6790;&#x5982;&#x4E0B;&#xFF1A;</p>
+<table>
+<thead>
+<tr>
+<th>time</th>
+<th>trx_a</th>
+<th>trx_b</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>time_1</td>
+<td>start transaction;</td>
+<td></td>
+</tr>
+<tr>
+<td>time_2</td>
+<td></td>
+<td>start transaction;</td>
+</tr>
+<tr>
+<td>time_3</td>
+<td>update test set status = 1 where oid = 5;<br><br>&#x7531;&#x4E8E;oid=5 &#x7684;&#x6570;&#x636E;&#x5B58;&#x5728;&#xFF0C;&#x7533;&#x8BF7;&#x83B7;&#x5F97; next-key lock&#xFF0C; &#x7533;&#x8BF7;&#x6210;&#x529F;&#xFF1B;</td>
+<td></td>
+</tr>
+<tr>
+<td>time_4</td>
+<td></td>
+<td>update test set status = 1 where oid = 5; (&#x9501;&#x7B49;&#x5F85;)<br><br>&#x7531;&#x4E8E;oid=5 &#x7684;&#x6570;&#x636E;&#x5B58;&#x5728;&#xFF0C; &#x7533;&#x8BF7;&#x83B7;&#x53D6;next-key lock&#xFF0C; &#x4F46;&#x662F;&#x6B64;&#x65F6;&#x5DF2;&#x7ECF;&#x6709; next-key lock &#x56E0;&#x6B64;&#x7B49;&#x5F85;&#x4E2D;&#xFF1B;</td>
+</tr>
+<tr>
+<td>time_5</td>
+<td>insert into test set id = 4, oid = 5;<br><br>&#x7533;&#x8BF7;&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;&#xFF0C;&#x4F46;&#x662F;&#x5DF2;&#x7ECF;&#x6709;&#x4E2A;next-key lock&#x5B58;&#x5728;&#xFF0C;&#x56E0;&#x6B64;&#x7B49;&#x5F85;&#x4E2D;&#xFF1B;</td>
+<td>ERROR 1213 (40001): Deadlock found when trying to get lock; try restarting transaction<br><br>&#x56E0;&#x6B64;&#x4E92;&#x76F8;&#x7B49;&#x5F85;&#xFF0C;&#x884C;&#x6210;&#x73AF;&#x5F62;&#x7B49;&#x5F85;</td>
+</tr>
+</tbody>
+</table>
+<h3 id="22-&#x6CE8;&#x610F;&#x70B9;">2.2 &#x6CE8;&#x610F;&#x70B9;</h3>
+<p>&#x4E0A;&#x8FF0;&#x65F6;&#x5E8F;&#x7684;&#x4E24;&#x4E2A;&#x5E76;&#x53D1;&#x64CD;&#x4F5C;&#x5E76;&#x4E0D;&#x4E00;&#x5B9A;&#x6B7B;&#x9501;&#x3002;</p>
+<p>&#x5982;&#xFF1A;</p>
+<p>&#x4E8B;&#x52A1;&#x5F00;&#x59CB;&#x524D;&#xFF0C;&#x6570;&#x636E;&#x60C5;&#x51B5;&#x5982;&#x4E0B;&#xFF1A;</p>
+<pre><code>mysql&gt; select * from test;
++----+-----+--------+
+| id | oid | status |
++----+-----+--------+
+|  1 |   1 |      0 |
+|  2 |   2 |      0 |
+|  5 |   5 |      0 |
+| 10 |  10 |      0 |
++----+-----+--------+
+</code></pre><p>&#x6309;&#x7167;&#x65F6;&#x5E8F;&#x8FDB;&#x884C;&#x64CD;&#x4F5C;&#xFF0C;<strong>&#x4E0D;&#x4F1A;&#x51FA;&#x73B0;&#x6B7B;&#x9501;</strong>&#xFF0C;&#x5982;&#x4E0B;&#xFF1A;</p>
+<table>
+<thead>
+<tr>
+<th>time</th>
+<th>trx_a</th>
+<th>trx_b</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>time_1</td>
+<td>start transaction;</td>
+<td></td>
+</tr>
+<tr>
+<td>time_2</td>
+<td></td>
+<td>start transaction;</td>
+</tr>
+<tr>
+<td>time_3</td>
+<td>update test set status = 1 where oid = 5;</td>
+<td></td>
+</tr>
+<tr>
+<td>time_4</td>
+<td></td>
+<td>update test set status = 1 where oid = 5; (&#x9501;&#x7B49;&#x5F85;)</td>
+</tr>
+<tr>
+<td>time_5</td>
+<td>insert into test set id = 6, oid = 5; //(&#x6CE8;&#x610F;&#xFF0C;&#x6B64;&#x65F6;id = 6 , &#x5927;&#x4E8E;5)</td>
+<td>Query OK, 1 row affected</td>
+</tr>
+</tbody>
+</table>
+<p>&#x539F;&#x56E0;&#xFF0C;&#x63D2;&#x5165;&#x7684;&#x4E3B;&#x952E;id &#x5927;&#x4E8E; oid &#x5BF9;&#x5E94;&#x7684; &#x4E3B;&#x952E;id; </p>
+<p><strong>&#x5269;&#x4E0B;&#x90E8;&#x5206;&#x5C5E;&#x4E8E;&#x81C6;&#x6D4B;&#xFF0C;&#x4E0D;&#x5B8C;&#x5168;&#x63A8;&#x6D4B;</strong>&#xFF1A;&#x7531;&#x4E8E;next-key lock  &#x4E2D;&#x7684;gap lock &#x53EF;&#x4EE5;&#x5206;&#x89E3;&#x4E3A; &#x4E24;&#x4E2A;&#x90E8;&#x5206;&#xFF0C;&#xFF08;pre, 5&#xFF09;&#x548C; &#xFF08;5&#xFF0C;next&#xFF09;, pre &#x548C; next &#x5206;&#x522B;&#x4E3A; oid &#x7D22;&#x5F15;&#x7684; &#x6570;&#x636E;&#x4E3A;5 &#x65F6;&#x7684;&#x524D;&#x4E00;&#x6761;&#x6570;&#x636E;&#x548C;&#x540E;&#x4E00;&#x6761;&#x6570;&#x636E;&#xFF1B;&#x7B49;&#x5F85;&#x4E0A;&#x9501;&#x7684;&#x65F6;&#x5019;&#xFF0C;&#x5148;&#x7B49;&#x5F85;&#x7ED9;&#xFF08;pre&#xFF0C;5&#xFF09;&#x4E0A;&#x9501;&#xFF0C;&#x5176;&#x5BF9;&#x5E94;&#x7684;&#x4E3B;&#x952E;id  &#x5C0F;&#x4E8E; oid = 5 &#x65F6;&#x7684;&#x4E3B;&#x952E;id 5; &#x6240;&#x4EE5;&#x5F53;&#x4E8B;&#x52A1;1&#x63D2;&#x5165; &#x4E3B;&#x952E;id &#x5927;&#x4E8E;5 &#x7684;&#x6570;&#x636E;&#x65F6;&#xFF0C;&#x4E0D;&#x4F1A;&#x9020;&#x6210;&#x9501;&#x7B49;&#x5F85;&#xFF1B;&#x56E0;&#x6B64;&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;&#x5B9E;&#x5219;&#x4E3A;gap&#x9501;&#xFF0C;&#x5F53; &#x4E3B;&#x952E;id &#x5927;&#x4E8E;5 &#x7684;&#x6570;&#x636E;&#x65F6;&#xFF0C;&#x6B64;&#x65F6;&#x7684;gap &#x533A;&#x95F4;&#x4E3A; &#xFF08;5&#xFF0C;next&#xFF09;, &#x800C;&#x4E8B;&#x52A1;b &#x6B64;&#x65F6;&#x5728;&#x7B49;&#x5F85;&#x7ED9;&#xFF08;pre, 5&#xFF09;&#x4E0A;&#x9501;&#xFF0C;&#x56E0;&#x6B64;&#x4E0D;&#x4F1A;&#x4EA7;&#x751F;&#x7B49;&#x5F85;&#xFF0C;&#x6545;&#x6267;&#x884C;&#x6210;&#x529F;&#x3002;</p>
+<h2 id="&#x4E09;&#x3001;&#x5C0F;&#x7ED3;">&#x4E09;&#x3001;&#x5C0F;&#x7ED3;</h2>
+<p>&#x53D1;&#x751F;&#x6B7B;&#x9501;&#x7684;&#x65F6;&#x5019;&#x662F;&#x4E2A;&#x5F88;&#x597D;&#x7684;&#x63D0;&#x5347;&#x6570;&#x636E;&#x5E93;&#x80FD;&#x529B;&#x7684;&#x65F6;&#x5019;&#xFF0C;&#x603B;&#x7ED3;&#x89E3;&#x51B3;&#x601D;&#x8DEF;&#xFF1A;</p>
+<p>&#xFF08;1&#xFF09;&#x6839;&#x636E;show engine innodb status , &#x627E;&#x51FA;&#x5BF9;&#x5E94;&#x7684;&#x6B7B;&#x9501;sql&#xFF0C;&#x8FDB;&#x800C;&#x627E;&#x5230;&#x5BF9;&#x5E94;&#x7684;&#x4E8B;&#x52A1;&#x5B8C;&#x6574;&#x6267;&#x884C;&#x60C5;&#x51B5;&#xFF1B;</p>
+<p>&#xFF08;2&#xFF09;&#x5C24;&#x5176;&#x6CE8;&#x610F; &#x63D2;&#x5165;&#x610F;&#x5411;&#x9501; &#x548C; gap/insert intention &#x4E4B;&#x95F4;&#x7684;&#x9501;&#x7B49;&#x5F85;&#xFF1B;</p>
+<p>&#xFF08;3&#xFF09;&#x501F;&#x52A9; INNODB_LOCKS &#x3001;INNODB_LOCK_WAITS &#x7B49;&#x8868;&#x6570;&#x636E;&#x8FDB;&#x4E00;&#x6B65;&#x5206;&#x6790;&#x3002;</p>
+<h2 id="&#x56DB;&#x3001;&#x53C2;&#x8003;">&#x56DB;&#x3001;&#x53C2;&#x8003;</h2>
+<p>[1] <a href="http://blog.itpub.net/22664653/viewspace-2145133/" target="_blank">&#x5982;&#x4F55;&#x9605;&#x8BFB;&#x6B7B;&#x9501;&#x65E5;&#x5FD7;</a></p>
+<p>[2] <a href="https://my.oschina.net/hebaodan/blog/1835966" target="_blank">mysql&#x5E76;&#x53D1;insert&#x6B7B;&#x9501;&#x95EE;&#x9898;&#x2014;&#x2014;gap&#x3001;&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;&#x51B2;&#x7A81;</a></p>
+<p>[3] <a href="https://blog.csdn.net/u010841296/article/details/84204701" target="_blank">Mysql&#x9501;&#x8BE6;&#x89E3;&#xFF08;&#x884C;&#x9501;&#x3001;&#x8868;&#x9501;&#x3001;&#x610F;&#x5411;&#x9501;&#x3001;Gap&#x9501;&#x3001;&#x63D2;&#x5165;&#x610F;&#x5411;&#x9501;&#xFF09;</a> </p>
+
+                                
+                                </section>
+                            
+    </div>
+    <div class="search-results">
+        <div class="has-results">
+            
+            <h1 class="search-results-title"><span class='search-results-count'></span> results matching "<span class='search-query'></span>"</h1>
+            <ul class="search-results-list"></ul>
+            
+        </div>
+        <div class="no-results">
+            
+            <h1 class="search-results-title">No results matching "<span class='search-query'></span>"</h1>
+            
+        </div>
+    </div>
+</div>
+
+                        </div>
+                    </div>
+                
+            </div>
+
+            
+                
+                <a href="走出焦虑.html" class="navigation navigation-prev navigation-unique" aria-label="Previous page: 走出焦虑">
+                    <i class="fa fa-angle-left"></i>
+                </a>
+                
+                
+            
+        
+    </div>
+
+    <script>
+        var gitbook = gitbook || [];
+        gitbook.push(function() {
+            gitbook.page.hasChanged({"page":{"title":"记一次mysql死锁","level":"1.3","depth":1,"previous":{"title":"走出焦虑","level":"1.2","depth":1,"path":"走出焦虑.md","ref":"走出焦虑.md","articles":[]},"dir":"ltr"},"config":{"gitbook":"*","theme":"default","variables":{},"plugins":["livereload"],"pluginsConfig":{"livereload":{},"highlight":{},"search":{},"lunr":{"maxIndexSize":1000000,"ignoreSpecialCharacters":false},"sharing":{"facebook":true,"twitter":true,"google":false,"weibo":false,"instapaper":false,"vk":false,"all":["facebook","google","twitter","weibo","instapaper"]},"fontsettings":{"theme":"white","family":"sans","size":2},"theme-default":{"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"},"showLevel":false}},"structure":{"langs":"LANGS.md","readme":"README.md","glossary":"GLOSSARY.md","summary":"SUMMARY.md"},"pdf":{"pageNumbers":true,"fontSize":12,"fontFamily":"Arial","paperSize":"a4","chapterMark":"pagebreak","pageBreaksBefore":"/","margin":{"right":62,"left":62,"top":56,"bottom":56}},"styles":{"website":"styles/website.css","pdf":"styles/pdf.css","epub":"styles/epub.css","mobi":"styles/mobi.css","ebook":"styles/ebook.css","print":"styles/print.css"}},"file":{"path":"死锁.md","mtime":"2019-07-09T08:23:48.000Z","type":"markdown"},"gitbook":{"version":"3.2.3","time":"2019-07-09T08:19:22.609Z"},"basePath":".","book":{"language":""}});
+        });
+    </script>
+</div>
+
+        
+    <script src="gitbook/gitbook.js"></script>
+    <script src="gitbook/theme.js"></script>
+    
+        
+        <script src="gitbook/gitbook-plugin-livereload/plugin.js"></script>
+        
+    
+        
+        <script src="gitbook/gitbook-plugin-search/search-engine.js"></script>
+        
+    
+        
+        <script src="gitbook/gitbook-plugin-search/search.js"></script>
+        
+    
+        
+        <script src="gitbook/gitbook-plugin-lunr/lunr.min.js"></script>
+        
+    
+        
+        <script src="gitbook/gitbook-plugin-lunr/search-lunr.js"></script>
+        
+    
+        
+        <script src="gitbook/gitbook-plugin-sharing/buttons.js"></script>
+        
+    
+        
+        <script src="gitbook/gitbook-plugin-fontsettings/fontsettings.js"></script>
+        
+    
+
+    </body>
+</html>
+
